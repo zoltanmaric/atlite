@@ -21,6 +21,7 @@ import weakref
 import cdsapi
 import logging
 from numpy import atleast_1d
+from pathlib import Path
 from ..gis import maybe_swap_spatial_dims
 from ..pv.solar_position import SolarPosition
 
@@ -293,14 +294,18 @@ def retrieve_data(product, chunks=None, tmpdir=None, lock=None, **updates):
         lock = nullcontext()
 
     with lock:
-        fd, target = mkstemp(suffix=".nc", dir=tmpdir)
-        os.close(fd)
+        # fd, target = mkstemp(suffix=".nc", dir=tmpdir)
+        # os.close(fd)
+        variable = request["variable"][0] if isinstance(request["variable"], list) else request["variable"]
+        file_name = f"{variable}_{request['year']}"
+        target = f"../{tmpdir}/{file_name}.nc" if Path(os.getcwd()).name == "scripts" else f"{tmpdir}/{file_name}.nc"
 
-        yearstr = ", ".join(atleast_1d(request["year"]))
-        variables = atleast_1d(request["variable"])
-        varstr = "".join(["\t * " + v + f" ({yearstr})\n" for v in variables])
-        logger.info(f"CDS: Downloading variables\n{varstr}")
-        result.download(target)
+        if not Path(target).exists():
+            yearstr = ", ".join(atleast_1d(request["year"]))
+            variables = atleast_1d(request["variable"])
+            varstr = "".join(["\t * " + v + f" ({yearstr})\n" for v in variables])
+            logger.info(f"CDS: Downloading variables\n{varstr}")
+            result.download(target)
 
     ds = xr.open_dataset(target, chunks=chunks or {})
     if tmpdir is None:
